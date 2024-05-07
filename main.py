@@ -1,6 +1,11 @@
+import time as t
 import argparse
 import sounddevice as sd
 import numpy as np
+
+from signal_chain import SignalChain
+from effects.distortion import Distortion
+from effects.chorus import Chorus
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -34,18 +39,24 @@ parser.add_argument(
 args = parser.parse_args(remaining)
 
 
+effects = SignalChain([
+    Distortion(volume=-10, drive=16, normalize=False),
+    Chorus()
+], block_size=32, samplerate=48000)
+
 def callback(indata, outdata, frames, time, status):
     if status:
         print(status)
-    #indata = signal_chain(indata)
+    indata = effects.apply(indata)
     outdata[:] = indata
 
 
+# The input device is a PreSonus Audiobox USB96
 try:
     with sd.Stream(device=(args.input_device, args.output_device),
                    samplerate=48000, blocksize=32,  # Look into exactly what changing this entails
-                   dtype='float32',
-                   latency=0.002,
+                   dtype='float32',  # Using int16 leaves it unnormalized. float32 normalizes the waveform
+                   latency=0.01,
                    channels=1,  # Stereo for now, could be mono
                    callback=callback):
         print('#' * 80)
